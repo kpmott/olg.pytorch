@@ -19,3 +19,6 @@ from math import floor, ceil
 from pynvml import *
 
 from tqdm import tqdm
+
+import logging
+logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)

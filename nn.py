@@ -72,19 +72,21 @@ class MODEL(pl.LightningModule):
         Cf = Ωf_ + (Pf+Δf_)*Ef_ + Bf_ - Pf*torch.nn.functional.pad(Ef,(0,1,0,0,0,0)) - Qf*torch.nn.functional.pad(Bf,(0,1,0,0,0,0))
 
         #Euler Errors
-        eqEuler = torch.sum(torch.abs(upinv(torch.tensordot(β*up(Cf[...,1:])/up(C[...,:-1])*(Pf+Δf_)/P,torch.tensor(probs),dims=([0],[0])))-1))
-        bondEuler = torch.sum(torch.abs(upinv(torch.tensordot(β*up(Cf[...,1:])/up(C[...,:-1])/Q,torch.tensor(probs),dims=([0],[0])))-1))
-        
+        eqEuler = torch.sum(torch.abs(upinv(torch.tensordot(β*up(Cf[...,1:])/up(C[...,:-1])*(Pf+Δf_)/P,torch.tensor(probs),dims=([0],[0])))-1),-1)
+        bondEuler = torch.sum(torch.abs(upinv(torch.tensordot(β*up(Cf[...,1:])/up(C[...,:-1])/Q,torch.tensor(probs),dims=([0],[0])))-1),-1)
+
         #Market Clearing Errors
-        equityMCC = torch.sum(torch.abs(equitysupply-torch.sum(E,-1)))
-        bondMCC = torch.sum(torch.abs(bondsupply-torch.sum(B,-1)))
+        equityMCC = torch.abs(equitysupply-torch.sum(E,-1))
+        bondMCC = torch.abs(bondsupply-torch.sum(B,-1))
+
+        loss_vec = eqEuler + bondEuler + equityMCC + bondMCC
 
         #Total Loss
         pretrain = (torch.max(y) > 0.)
         if pretrain: 
             loss = self.mse(y_pred,y)
         else:
-            loss = equityMCC + bondMCC + eqEuler + bondEuler + cpen
+            loss = self.mse(loss_vec,loss_vec*0)
         
         return loss
 
@@ -94,28 +96,39 @@ class MODEL(pl.LightningModule):
         return preds
     
     def configure_optimizers(self):
-        return Adam(self.model.parameters(), lr=1e-6)
+        return Adam(self.model.parameters(), lr=1e-7)
 
 model = MODEL().to("cuda")
 
 class CustDataSet(Dataset):
-    def __init__(self,pretrain=False):
+    def __init__(self,pretrain=False,cpu=False,sim=False):
         model.to("cuda")
+        model.eval()
         Σ = torch.zeros(T,input)
         Y = torch.zeros(T,output)
         Σ[0] = torch.tensor([*ebar,*bbar,*[wbar],*ω_scalar,*[δ_scalar]])
         Y[0] = model(Σ[0])
         shist, whist, Ωhist, Δhist, Ω, Δ = SHOCKS()
-        for t in tqdm(range(1,T)):
+        for t in range(1,T):
             Σ[t] = torch.tensor([[*Y[t-1,equity],*Y[t-1,bond],*[whist[t]],*Ωhist[t],*[Δhist[t]]]])
             Y[t] = model(Σ[t])
-        self.Σ = Σ.detach().clone()
         
-        #FOR PRE-TRAINING: THESE ARE LABELS
+        Σ, Y = Σ[time], Y[time]
+
         if pretrain:
-            self.Y = torch.ones(T,output)*torch.tensor([*ebar,*bbar,*[pbar],*[qbar]]).float()
+            self.Y = torch.ones(train,output)*torch.tensor([*ebar,*bbar,*[pbar],*[qbar]]).float()
+        elif sim:
+            self.Y = Y.detach().clone()
         else:
-            self.Y = torch.zeros(T,output).float()
+            self.Y = torch.zeros(train,output).float()
+
+        if cpu:
+            self.Σ = Σ.detach().clone().cpu()
+            self.Y = self.Y.cpu()
+        else: 
+            self.Σ = Σ.detach().clone()
+
+        model.train()
 
     def __len__(self):
         return len(self.Y)

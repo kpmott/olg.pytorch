@@ -53,7 +53,7 @@ def detSS_allocs():
     #Guess equity is hump-shaped
     eguess = norm.pdf(range(1,L),.8*wp,.6*wp)
     eguess = [equitysupply*x/sum(eguess) for x in eguess]
-    pguess = .15 + floor(L/30)
+    pguess = .05 + floor(L/30)
 
     #fsolve(ss_eq,[*eguess,*[pguess]],full_output=1,maxfev=int(10e8))
     if fsolve(ss_eq,[*eguess,*[pguess]],full_output=1,maxfev=int(10e8))[-2] != 1:

@@ -69,8 +69,8 @@ def upinv(x):
 
 #-----------------------------------------------------------------------------------------------------------------
 #time and such for neurals 
-T = 7500
-burn = int(T/100)            #burn period: this is garbage
+T = 12500
+burn = 5000            #burn period: this is garbage
 train = T - burn            #how many periods are "counting?"
 time = slice(burn,T,1)      #period in which we care
 
