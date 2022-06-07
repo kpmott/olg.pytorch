@@ -30,8 +30,11 @@ wbar = 1
 ωGuess = (1-divshare)*ωGuess/np.sum(ωGuess)
 
 #share of total resources: 1/8 to dividend; the rest to endowment income
-# ls = wbar*np.array([*[divshare], *ωGuess, *np.zeros(rp)])
-ls = np.array([1/3, 1/4, 5/12, 0])
+if L == 3:
+    ls = np.array([1/3, 1/4, 5/12, 0])
+else:
+    ls = wbar*np.array([*[divshare], *ωGuess, *np.zeros(rp)])
+
 
 
 #shock perturbation vector

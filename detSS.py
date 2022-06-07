@@ -51,11 +51,11 @@ def detSS_allocs():
         #return np.sum(np.abs(ssVec))
 
     #Guess equity is hump-shaped
-    eguess = norm.pdf(range(1,L),.8*wp,.6*wp)
+    eguess = norm.pdf(range(1,L),wp,.2*wp)
     eguess = [equitysupply*x/sum(eguess) for x in eguess]
-    pguess = .05 + floor(L/30)
+    pguess = .35 + 2*floor(L/30)
 
-    #fsolve(ss_eq,[*eguess,*[pguess]],full_output=1,maxfev=int(10e8))
+    fsolve(ss_eq,[*eguess,*[pguess]],full_output=1,maxfev=int(10e8))
     if fsolve(ss_eq,[*eguess,*[pguess]],full_output=1,maxfev=int(10e8))[-2] != 1:
         print('Solution not found for detSS!')
         exit()

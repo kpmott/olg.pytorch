@@ -2,3 +2,4 @@ pyt/
 lightning_logs/
 __pycache__/
 checkpoints/
+*.png

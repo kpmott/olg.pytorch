@@ -4,7 +4,7 @@ import detSS
 
 ebar,bbar,pbar,qbar,xbar,cbar = detSS.detSS_allocs()
 
-sizes = [input,2048,2048,1024,output]
+sizes = [input,2048,1024,1024,1024,output]
 
 class custAct(nn.Module):
     def __init__(self):
@@ -24,10 +24,11 @@ class MODEL(pl.LightningModule):
     def __init__(self):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(in_features=sizes[0],out_features=sizes[1]),nn.ReLU(),nn.Dropout(p=0.1),
-            nn.Linear(in_features=sizes[1],out_features=sizes[2]),nn.ReLU(),nn.Dropout(p=0.1),
-            nn.Linear(in_features=sizes[2],out_features=sizes[3]),nn.ReLU(),nn.Dropout(p=0.1),
-            nn.Linear(in_features=sizes[3],out_features=sizes[4]),custAct()
+            nn.Linear(in_features=sizes[0],out_features=sizes[1]),nn.ReLU(),nn.Dropout(p=0.2),
+            nn.Linear(in_features=sizes[1],out_features=sizes[2]),nn.ReLU(),nn.Dropout(p=0.2),
+            nn.Linear(in_features=sizes[2],out_features=sizes[3]),nn.ReLU(),nn.Dropout(p=0.2),
+            nn.Linear(in_features=sizes[3],out_features=sizes[4]),nn.ReLU(),nn.Dropout(p=0.2),
+            nn.Linear(in_features=sizes[4],out_features=sizes[5]),custAct()
         )
         self.mse = nn.MSELoss()
         #self.pretrain = pretrain
@@ -52,7 +53,7 @@ class MODEL(pl.LightningModule):
         Ω_ = x[...,endow]
         Δ_ = x[...,div]
         Chat = Ω_ + (P+Δ_)*E_ + B_ - P*torch.nn.functional.pad(E,(0,1)) - Q*torch.nn.functional.pad(B,(0,1))
-        ϵc = 1e-4
+        ϵc = 1e-6
         C = torch.maximum(Chat,ϵc*(Chat*0+1))
         cpen = -torch.sum(torch.less(Chat,0)*Chat/ϵc)
 
@@ -79,7 +80,7 @@ class MODEL(pl.LightningModule):
         equityMCC = torch.abs(equitysupply-torch.sum(E,-1))
         bondMCC = torch.abs(bondsupply-torch.sum(B,-1))
 
-        loss_vec = eqEuler + bondEuler + equityMCC + bondMCC
+        loss_vec = eqEuler + bondEuler + equityMCC + bondMCC + cpen
 
         #Total Loss
         pretrain = (torch.max(y) > 0.)
@@ -96,7 +97,7 @@ class MODEL(pl.LightningModule):
         return preds
     
     def configure_optimizers(self):
-        return Adam(self.model.parameters(), lr=1e-7)
+        return Adam(self.model.parameters(), lr=1e-5)
 
 model = MODEL().to("cuda")
 
