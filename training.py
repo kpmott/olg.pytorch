@@ -7,14 +7,33 @@ from nn import *
 # model.to("cuda")
 data = CustDataSet(pretrain=True)
 train_loader = DataLoader(data,batch_size=100,generator=torch.Generator(device="cuda"),shuffle=True)
-trainer = pl.Trainer(max_epochs=500, accelerator="gpu",logger=False,enable_checkpointing=False)
+trainer = pl.Trainer(max_epochs=100, accelerator="gpu",logger=False,enable_checkpointing=False)
 trainer.fit(model=model,train_dataloaders=train_loader)
 
-for thyme in tqdm(range(100)):
+iters = 500
+losshist = np.zeros((iters))
+
+#machine tolerance
+ϵ = 1e-5
+
+for thyme in tqdm(range(iters)):
     data = CustDataSet()
     train_loader = DataLoader(data,batch_size=32,generator=torch.Generator(device="cuda"),shuffle=True)
     trainer = pl.Trainer(max_epochs=1, accelerator="gpu",logger=False,enable_checkpointing=False,enable_model_summary=False)
     trainer.fit(model=model,train_dataloaders=train_loader)
+    Σ = data[:][0]
+    losses = model.losscalc(Σ)
+    msecalc = torch.nn.MSELoss()
+    lossrun = msecalc(losses,losses*0).cpu().detach().numpy()
+    losshist[thyme] = lossrun
+    plt.plot(losshist[:thyme+1]);plt.yscale('log');plt.savefig('losses.png');plt.clf()
+
+    if lossrun < ϵ:
+        print("Convergence in "+str(thyme)+" steps.")
+        break
+
+
+
 
 def plots():
     #Inspect output
@@ -79,4 +98,4 @@ def plots():
 
     return C
 
-C = plots()
+plots()

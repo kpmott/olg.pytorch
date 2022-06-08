@@ -36,8 +36,9 @@ class MODEL(pl.LightningModule):
     def forward(self,x):
         return self.model(x)
     
-    def training_step(self,batch,batch_idx):
-        x, y = batch
+    def losscalc(self,x):
+        self.model = self.model.to("cuda")
+        self.model = self.model.eval()
         y_pred = self.model(x)
         τ = len(y_pred)
 
@@ -61,7 +62,7 @@ class MODEL(pl.LightningModule):
         endog = torch.concat([E,B],-1)[None].repeat(S,1,1)
         exog = torch.tensor([[*[wvec[s]],*ωvec[s], *[δvec[s]]] for s in range(S)])[:,None,:].repeat(1,τ,1)
         Σf = torch.concat([endog,exog],-1).float()
-        Yf = model(Σf)
+        Yf = self.model(Σf)
         Ef = Yf[...,equity]
         Bf = Yf[...,bond]
         Pf = Yf[...,price]
@@ -82,6 +83,16 @@ class MODEL(pl.LightningModule):
 
         loss_vec = eqEuler + bondEuler + equityMCC + bondMCC + cpen
 
+        self.model = self.model.train()
+
+        return loss_vec
+
+    def training_step(self,batch,batch_idx):
+        x, y = batch
+        y_pred = self.model(x)
+
+        loss_vec = self.losscalc(x)
+        
         #Total Loss
         pretrain = (torch.max(y) > 0.)
         if pretrain: 
