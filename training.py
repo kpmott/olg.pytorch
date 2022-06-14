@@ -44,8 +44,7 @@ for thyme in tqdm(range(iters)):
     
     #check loss, plot
     losses = model.losscalc(data.Σ)
-    msecalc = torch.nn.MSELoss()
-    lossrun = msecalc(losses,losses*0).cpu().detach().numpy()
+    lossrun = loss(losses,losses*0).cpu().detach().numpy()
     losshist[thyme] = lossrun
     plt.plot(losshist[:thyme+1]);plt.yscale('log');plt.savefig('losses.png');plt.clf()
     if lossrun < ϵ:
