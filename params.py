@@ -1,60 +1,60 @@
-import os
-os.chdir("/home/kpmott/Git/olg.pytorch")
-
 from packages import *
 
-#Lifespan 
+#---------------------------------------------------------------------------------
+#economic parameters
+
+#Lifespan of agents
 L = 3
 
-#working periods and retirement periods 
+#working periods and retirement periods : endowment=0 in retirement
 wp = int(L*2/3)
 rp = L - wp
 
 #Time discount rate
 β = 1.#0.995**(60/L)
 
-#Risk-aversion coeff
-γ = 2.
-
-#Stochastic elements
-probs = [0.5, 0.5]
-S = len(probs) 
-
-divshare = .05
+divshare = .05 #dividend share of total income 
 
 #total resources
 wbar = 1
 
-#share of total resources
+#endowment share of total resources
 ωGuess = norm.pdf(np.linspace(1,wp,wp),0.8*wp,L*0.25)
 ωGuess = (1-divshare)*ωGuess/np.sum(ωGuess)
 
-#share of total resources: 1/8 to dividend; the rest to endowment income
+#share of total resources: [divident, working endowment, retirement endowment=0]
 if L == 3:
     ls = np.array([1/3, 1/4, 5/12, 0])
 else:
     ls = wbar*np.array([*[divshare], *ωGuess, *np.zeros(rp)])
 
-
-
-#shock perturbation vector
-ζtrue = 0.05
+#---------------------------------------------------------------------------------
+#stochastics 
+probs = [0.5, 0.5] #prob of each state
+S = len(probs)  #number of states
+ζtrue = 0.05 #aggregate shock size 
 wvec = np.array([wbar*(1 - ζtrue), wbar*(1+ + ζtrue)])     #total resources in each state
 δvec = np.multiply(ls[0],wvec)/wbar          #dividend in each state
-ωvec = [ls[1:]*w/wbar for w in wvec]         #endowment process
+ωvec = [ls[1:]*w/wbar for w in wvec]         #endowment process in each state
 
+#convert endowment and dividend to tensors for later
 ω = torch.tensor(np.array(ωvec))
 δ = torch.reshape(torch.tensor(δvec),(S,1))
 
-#mean-center all shock-contingent values
+#mean-center: deterministic steady-state values
 δ_scalar = ls[0]
 ω_scalar = ls[1:]
 
-#net supply of assets: for later
+#net supply of assets
 equitysupply = 1
 bondsupply = 0
 
 #-----------------------------------------------------------------------------------------------------------------
+#utility function 
+
+#Risk-aversion coeff
+γ = 2.
+
 #utility
 def u(x):
     if γ == 1:
@@ -71,23 +71,25 @@ def upinv(x):
     return x**(1/γ)
 
 #-----------------------------------------------------------------------------------------------------------------
-#time and such for neurals 
-T = 12500
-burn = 5000            #burn period: this is garbage
-train = T - burn            #how many periods are "counting?"
-time = slice(burn,T,1)      #period in which we care
+#time path 
 
+T = 12500 #number of periods to simulate
+burn = 5000 #burn period: throw this away
+train = T - burn #the number of periods to train on 
+time = slice(burn,T,1) #training period slice
+
+#draw path of shocks 
 def SHOCKS():
-    #shocks
+    #shocks: {1,...,S=2}
     shocks = range(S)
     
     #Shock history:
     shist = np.random.choice(shocks,T,probs)
 
-    #History: endowments and dividends and total resources
-    Ωhist = [ωvec[t] for t in shist]
-    Δhist = δvec[shist]
-    whist = wvec[shist]
+    #History: endowments, dividends, resources
+    Ωhist = [ωvec[t] for t in shist] #endowments
+    Δhist = δvec[shist] #dividends
+    whist = wvec[shist] #total resources 
 
     #convert to tensors now for easier operations later
     Ω = torch.tensor(np.array(Ωhist))
@@ -96,17 +98,20 @@ def SHOCKS():
     return shist, whist, Ωhist, Δhist, Ω, Δ
 
 #-----------------------------------------------------------------------------------------------------------------
+#input/output size information and slices
+
 """
-input   = [(e_i^{t-1})_i,(b_i^{t-1})_i,w^t,(ω_i^t)_i,t]
+input   = [(e_i^{t-1})_i,(b_i^{t-1})_i,w^t,(ω_i^t)_i,δ^t]
+          [lagged asset holdings,state-contingent total resources,state-contingent endowment,state-contingent dividend]
 output  = [((e_i^{t})_{i=1}^{L-1},(b_i^{t})_{i=1}^{L-1},p^t,q^t]   ∈ ℜ^{2L}
+          [asset holdings, prices]  
 """
 #input/output dims
-#        assets     + resources     + endowments    + div   + time
-input = 2*(L-1)     + 1             + L             + 1     #+ 1
+#        assets     + resources     + endowments    + div
+input = 2*(L-1)     + 1             + L             + 1
 
-#        assets     + prices   + endowments    + div   + time
-output = 2*(L-1)    + 2        #+ L             + 1     + 1
-output_endog = 2*(L-1)+2
+#        assets     + prices
+output = 2*(L-1)    + 2
 
 #slices to grab output 
 equity =    slice(0     ,L-1    ,1)
